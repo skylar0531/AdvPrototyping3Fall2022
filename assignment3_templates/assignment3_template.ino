@@ -23,8 +23,10 @@ bool underlineOn = false;
 unsigned long ledBlinkTimer = 0;
 bool ledBlinkOn = false;
 
-const int sensorPin = 33;  // 4-wire bottom connector input pin used by M5 units
+const int sensorPin = 33;  // 4-wire bottom connector input pin used by M5 units(try26)
+const int pressurePin = 26;
 int sensorVal = 0;
+int pressureVal = 0;
 unsigned long sensorTimer = 0;
 int brightnessVal = 0;
 
@@ -41,7 +43,7 @@ void setup() {
 
   M5.rtc.GetTime(&RTCTimeSave);
   AlarmTime = RTCTimeSave;
-  AlarmTime.Minutes = AlarmTime.Minutes + 2;  // set alarm 2 minutes ahead 
+  AlarmTime.Minutes = AlarmTime.Minutes + 1;  // set alarm 2 minutes ahead 
   M5.update();
   
   M5.M5Ink.clear();
@@ -90,16 +92,28 @@ void loop() {
     }
     // state behavior: read sensor and print its value to Serial port
     if(millis() > sensorTimer + 100) {
-      sensorVal = analogRead(sensorPin);
-      brightnessVal = map(sensorVal, 0, 4095, 0, 255);
-      Serial.println(brightnessVal);
-      sensorTimer = millis();    
+      // if(pressureVal >= 2500 && pressureVal <= 3500) {
+      //   Serial.println("BtnEXT wasPressed!");
+      //   M5.M5Ink.clear();
+      //   PageSprite.clear(CLEAR_DRAWBUFF | CLEAR_LASTBUFF);
+      //   program_state = STATE_ALARM_FINISHED;
+      //   Serial.println("program_state => STATE_ALARM_FINISHED");
+      // }
+      
+      //sensorVal = analogRead(sensorPin);
+      pressureVal = analogRead(pressurePin);
+      brightnessVal = map(pressureVal, 0, 4095, 0, 255);
+      //Serial.println(brightnessVal);
+      Serial.println(pressureVal);
+      sensorTimer = millis();   
+      
+      // (OPTIONAL) state behavior: change RGB LEDs green level according to sensor value:
+      for( int i=0; i<3; i++) {
+        pixels.setPixelColor(i, pixels.Color(0, brightnessVal, 0)); 
+        pixels.show(); 
+      }
     }
-    // (OPTIONAL) state behavior: change RGB LEDs green level according to sensor value:
-    for( int i=0; i<3; i++) {
-      pixels.setPixelColor(i, pixels.Color(0, brightnessVal, 0)); 
-      pixels.show(); 
-    }
+    
     // state transition: MID button 
     if ( M5.BtnMID.wasPressed()) {
       AlarmTime = RTCtime;
@@ -107,7 +121,7 @@ void loop() {
       Serial.println("program_state => STATE_EDIT_MINUTES");
     }
     // state transition: alarm time equals real time clock 
-    else if(AlarmTime.Hours == RTCtime.Hours && AlarmTime.Minutes == RTCtime.Minutes) {
+    if(AlarmTime.Hours == RTCtime.Hours && AlarmTime.Minutes == RTCtime.Minutes) {
       program_state = STATE_ALARM;
       Serial.println("program_state => STATE_ALARM");
     }
@@ -194,10 +208,24 @@ void loop() {
     if(millis() > rtcTimer + 1000) {
       updateTime();
       drawTime();
-      //drawTimeToAlarm();    
-      PageSprite.drawString(45, 130, "  ALARM IS ON  ");
-      PageSprite.pushSprite();   
+      drawTimeToAlarm();
+      M5.Speaker.beep();
       rtcTimer = millis();
+      
+      // read the pressure sensor:
+      if(millis() > sensorTimer + 100) {
+        pressureVal = analogRead(pressurePin);
+        Serial.println(pressureVal);
+        sensorTimer = millis();   
+      }
+      
+      if(pressureVal >= 2500 && pressureVal <= 3500) {
+        Serial.println("sensor was pressed!");
+        M5.M5Ink.clear();
+        PageSprite.clear(CLEAR_DRAWBUFF | CLEAR_LASTBUFF);
+        program_state = STATE_ALARM_FINISHED;
+        Serial.println("program_state => STATE_ALARM_FINISHED");
+      }
     }
     // (OPTIONAL) state behavior: blink RGB LEDs red every 500ms
     if(millis() > ledBlinkTimer + 500) {
@@ -233,7 +261,7 @@ void loop() {
     if(millis() > rtcTimer + 1000) {
       updateTime();
       drawTime();
-      PageSprite.drawString(50, 130, "ALARM IS OFF");
+      PageSprite.drawString(50, 120, "ALARM IS OFF");
       PageSprite.pushSprite();    
       rtcTimer = millis();
     }
